@@ -112,4 +112,29 @@ describe('X12Parser', () => {
       throw new Error('ParserError expected when elementDelimiter in document does not match and parser is strict.')
     }
   })
+
+  it.only('should set segment paths using segment header loopStyle', () => {
+    const edi = fs.readFileSync('test/test-data/271.edi', 'utf8')
+    const parser = new X12Parser(true)
+
+    const interchange = parser.parse(edi) as X12Interchange
+
+    const segmentPaths: any[] = []
+
+    interchange.functionalGroups.forEach((fg) => {
+      fg.transactions.forEach((t) => {
+        t.segments.forEach((s) => {
+          if (s.loopPath !== undefined) {
+            segmentPaths.push(`${s.tag}: ${s.loopPath}`)
+          }
+        })
+      })
+    })
+
+    console.log(segmentPaths)
+
+    if (segmentPaths.length === 0) {
+      throw new Error('Unable to find any segment loop paths')
+    }
+  })
 })

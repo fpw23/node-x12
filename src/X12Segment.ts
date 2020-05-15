@@ -7,7 +7,7 @@ import {
   defaultSerializationOptions,
   X12SerializationOptions
 } from './X12SerializationOptions'
-import { ISASegmentHeader } from './X12SegmentHeader'
+import { ISASegmentHeader, X12SegmentHeader } from './X12SegmentHeader'
 import { GeneratorError } from './Errors'
 
 export class X12Segment {
@@ -27,6 +27,7 @@ export class X12Segment {
   elements: X12Element[];
   range: Range;
   options: X12SerializationOptions;
+  loopPath?: string;
 
   /**
    * @description Set the elements of this segment.
@@ -154,6 +155,24 @@ export class X12Segment {
    */
   toJSON (): object {
     return new JSEDISegment(this.tag, this.elements.map(x => x.value)) as object
+  }
+
+  /**
+   * @description Gets the segement header.
+   * @returns {X12SegmentHeader} A header if defined otherwise undefined.
+   */
+  getHeader (): X12SegmentHeader {
+    if (this._checkSupportedSegment()) {
+      const match = this.options.segmentHeaders.find((sh) => { return sh.tag === this.tag })
+
+      if (match !== undefined) {
+        return match
+      } else {
+        throw Error(`Unable to find segment header for tag '${this.tag}' even though it should be support`)
+      }
+    } else {
+      return undefined
+    }
   }
 
   /**

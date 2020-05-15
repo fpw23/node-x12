@@ -1,9 +1,15 @@
 'use strict'
 
+export enum X12SegmentHeaderLoopStyle {
+  Bounded = 'bounded',
+  Unbounded = 'unbounded'
+}
+
 export interface X12SegmentHeader {
   tag: string
   trailer?: string
   layout: any
+  loopStyle?: X12SegmentHeaderLoopStyle
 }
 
 export const ISASegmentHeader: X12SegmentHeader = {
@@ -28,11 +34,13 @@ export const ISASegmentHeader: X12SegmentHeader = {
     ISA16: 1,
     COUNT: 16,
     PADDING: true
-  }
+  },
+  loopStyle: X12SegmentHeaderLoopStyle.Bounded
 }
 
 export const GSSegmentHeader: X12SegmentHeader = {
   tag: 'GS',
+  trailer: 'GE',
   layout: {
     GS01: 2,
     GS02: 15,
@@ -50,16 +58,49 @@ export const GSSegmentHeader: X12SegmentHeader = {
     GS08_MIN: 1,
     COUNT: 8,
     PADDING: false
-  }
+  },
+  loopStyle: X12SegmentHeaderLoopStyle.Bounded
 }
 
 export const STSegmentHeader: X12SegmentHeader = {
   tag: 'ST',
+  trailer: 'SE',
   layout: {
     ST01: 3,
     ST02: 9,
     ST02_MIN: 4,
     COUNT: 2,
     PADDING: false
+  },
+  loopStyle: X12SegmentHeaderLoopStyle.Bounded
+}
+
+export const LSSegmentHeader: X12SegmentHeader = {
+  tag: 'LS',
+  trailer: 'LE',
+  layout: {
+    LS01: 4,
+    LS01_MIN: 1,
+    COUNT: 1,
+    PADDING: false
+  },
+  loopStyle: X12SegmentHeaderLoopStyle.Bounded
+}
+
+export const LESegmentHeader: X12SegmentHeader = {
+  tag: 'LE',
+  layout: {
+    LS01: 4,
+    LS01_MIN: 1,
+    COUNT: 1,
+    PADDING: false
   }
 }
+
+export const StandardSegmentHeaders = [
+  ISASegmentHeader,
+  GSSegmentHeader,
+  STSegmentHeader,
+  LSSegmentHeader,
+  LESegmentHeader
+]

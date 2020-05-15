@@ -194,8 +194,12 @@ export class X12Parser extends Transform {
     let tagged = false
     let currentSegment: X12Segment
     let currentElement: X12Element
+    const loopPath: any[] = []
+    let loopPathTrailers: string[] = []
+    let currentLoopPath: any = { index: 0 }
 
     currentSegment = new X12Segment()
+    currentSegment.options = this._options
 
     for (let i = 0, l = 0, c = 0; i < edi.length; i++) {
       // segment not yet named and not whitespace or delimiter - begin naming segment
@@ -231,9 +235,48 @@ export class X12Parser extends Transform {
 
         currentSegment.range.end = new Position(l, c)
 
+        const header = currentSegment.getHeader()
+
+        // is it time to manage the loop?
+        if (currentSegment.tag === currentLoopPath.tag) {
+          // we are ending an unbounded loop
+          loopPath.shift()
+          // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+          const nextIndex = currentLoopPath.index + 1
+          currentLoopPath = {
+            tag: header.tag,
+            // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+            index: nextIndex,
+            trailer: header.trailer,
+            path: `${[...loopPath.map((lp) => lp.tag), header.tag].join('.')}:${nextIndex}`
+          }
+          loopPath.push(currentLoopPath)
+        } else if (loopPathTrailers.findIndex((t) => currentSegment.tag === t) > -1) {
+          // we are ending a bound loop
+          loopPath.shift()
+          if (loopPath.length > 0) {
+            currentLoopPath = loopPath[loopPath.length - 1]
+          } else {
+            currentLoopPath = { index: 0 }
+          }
+        } else if (header !== undefined && header.loopStyle !== undefined) {
+          // we are staring a new loop
+          currentLoopPath = {
+            tag: header.tag,
+            index: 0,
+            trailer: header.trailer,
+            path: `${[...loopPath.map((lp) => lp.tag), header.tag].join('.')}:0`
+          }
+          loopPath.push(currentLoopPath)
+          // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+          loopPathTrailers = loopPath.map((lp) => { return lp.trailer || '' })
+        }
+
+        currentSegment.loopPath = currentLoopPath.path
         segments.push(currentSegment)
 
         currentSegment = new X12Segment()
+        currentSegment.options = this._options
         tagged = false
 
         if (segmentTerminator === '\n') {
