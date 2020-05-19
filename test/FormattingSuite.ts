@@ -25,8 +25,7 @@ describe('X12Formatting', () => {
     const interchange = parser.parse(edi) as X12FatInterchange
 
     const options: X12SerializationOptions = {
-      format: true,
-      endOfLine: '\n'
+      format: true
     }
 
     const edi2 = interchange.toString(options)

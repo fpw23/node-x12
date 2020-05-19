@@ -30,7 +30,7 @@ export class X12Transaction {
    */
   setHeader (elements: string[], options?: X12SerializationOptions): void {
     options = options !== undefined
-      ? defaultSerializationOptions(options)
+      ? defaultSerializationOptions(options, false)
       : this.options
 
     this.header = new X12Segment(STSegmentHeader.tag, options)

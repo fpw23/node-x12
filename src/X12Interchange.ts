@@ -109,6 +109,35 @@ export class X12Interchange {
   }
 
   /**
+   * @description Get a list of the parsed segment loops.
+   * @param {boolean} [textOnly] - Return just a text list for output dislay, default is true.
+   * If false will return a list of detailed objects.
+   * @returns {any[]} A string list of segment loops.
+   */
+  getSegmentLoops (textOnly: boolean = true): any[] {
+    const segmentLoops: any[] = []
+    this.functionalGroups.forEach((fg) => {
+      fg.transactions.forEach((t) => {
+        t.segments.forEach((s) => {
+          if (s.loopPath !== undefined) {
+            if (textOnly === true) {
+              segmentLoops.push(`${s.loopPath}(${s.loopIndex}) - ${s.tag}(${s.parseIndex})`)
+            } else {
+              segmentLoops.push({
+                tag: s.tag,
+                loopPath: s.loopPath,
+                loopIndex: s.loopIndex,
+                parseIndex: s.parseIndex
+              })
+            }
+          }
+        })
+      })
+    })
+    return segmentLoops
+  }
+
+  /**
    * @description Serialize interchange to JS EDI Notation object.
    * @returns {JSEDINotation} This interchange converted to JS EDI Notation object.
    */

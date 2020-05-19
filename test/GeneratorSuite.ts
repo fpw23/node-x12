@@ -1,7 +1,7 @@
 'use strict'
 
 import 'mocha'
-import { JSEDINotation, X12Generator, X12Parser, ISASegmentHeader, GSSegmentHeader, X12Interchange } from '../core'
+import { JSEDINotation, X12Generator, X12Parser, ISASegmentHeader, GSSegmentHeader, X12Interchange, X12SerializationOptions } from '../core'
 import fs = require('fs')
 
 describe('X12Generator', () => {
@@ -10,7 +10,11 @@ describe('X12Generator', () => {
     const parser = new X12Parser(true)
     const notation: JSEDINotation = parser.parse(edi).toJSEDINotation() as JSEDINotation
 
-    const generator = new X12Generator(notation)
+    const options: X12SerializationOptions = {
+      format: true
+    }
+
+    const generator = new X12Generator(notation, options)
 
     const edi2 = generator.toString()
 
@@ -21,7 +25,12 @@ describe('X12Generator', () => {
 
   it('should replicate the source data to and from JSON unless changes are made', () => {
     const edi = fs.readFileSync('test/test-data/850.edi', 'utf8')
-    const parser = new X12Parser(true)
+
+    const options: X12SerializationOptions = {
+      format: true
+    }
+
+    const parser = new X12Parser(true, options)
     const interchange = parser.parse(edi)
 
     const json = JSON.stringify(interchange)
@@ -54,8 +63,6 @@ describe('X12Generator', () => {
     } catch (err) {
       error = err.message
     }
-
-    console.log(error)
 
     if (error !== 'Segment "ST" with 3 elements does meet the required count of 2.') {
       throw new Error('271 with 3 ST elements parsing succeed which should not happen')
@@ -129,7 +136,7 @@ describe('X12Generator', () => {
       ]
     }
 
-    const parser = new X12Parser(true)
+    const parser = new X12Parser(options)
     const interchange = parser.parse(edi)
 
     const json = JSON.stringify(interchange)

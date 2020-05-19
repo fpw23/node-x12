@@ -23,6 +23,7 @@ export class X12QueryEngine {
 
   private readonly _forEachPattern: RegExp = /FOREACH\([A-Z0-9]{2,3}\)=>.+/g;
   private readonly _concatPattern: RegExp = /CONCAT\(.+,.+\)=>.+/g;
+  private readonly _forSegLoopPattern: RegExp = /FORSEGLOOP\((.+)\)=>(.+)/g;
 
   /**
    * @description Query all references in an EDI document.
@@ -35,6 +36,7 @@ export class X12QueryEngine {
     const interchange = typeof rawEdi === 'string'
       ? this._parser.parse(rawEdi) as X12Interchange
       : rawEdi
+    let segLoopFilter: string
 
     const forEachMatch = reference.match(this._forEachPattern) // ex. FOREACH(LX)=>MAN02
 
@@ -50,6 +52,16 @@ export class X12QueryEngine {
       reference = concat.query
     }
 
+    // eslint-disable-next-line dot-notation
+    const forSegLoopMatch = [...reference['matchAll'](this._forSegLoopPattern)] // ex. FORSEGLOOP(ISA.GS.ST=271.HL=22.NM1=IL.EB=1)=>DTP
+
+    if (forSegLoopMatch.length === 1) {
+      segLoopFilter = forSegLoopMatch[0][1]
+      reference = forSegLoopMatch[0][2]
+    } else if (forSegLoopMatch.length > 1) {
+      throw new Error('Error parsing FORSEGLOOP marco, found too many results.')
+    }
+
     const hlPathMatch = reference.match(/HL\+(\w\+?)+[+-]/g) // ex. HL+O+P+I
     const segPathMatch = reference.match(/((?<!\+)[A-Z0-9]{2,3}-)+/g) // ex. PO1-N9-
     const elmRefMatch = reference.match(/[A-Z0-9]{2,3}[0-9]{2}[^[]?/g) // ex. REF02; need to remove trailing ":" if exists
@@ -62,10 +74,16 @@ export class X12QueryEngine {
 
       for (let j = 0; j < group.transactions.length; j++) {
         const txn = group.transactions[j]
-        let segments = txn.segments
+        let segments
+
+        if (segLoopFilter !== undefined) {
+          segments = txn.segments.filter((s) => { return s.loopPath === segLoopFilter })
+        } else {
+          segments = txn.segments
+        }
 
         if (hlPathMatch !== null) {
-          segments = this._evaluateHLQueryPart(txn, hlPathMatch[0])
+          segments = this._evaluateHLQueryPart(segments, hlPathMatch[0])
         }
 
         if (segPathMatch !== null) {
@@ -165,15 +183,15 @@ export class X12QueryEngine {
     }
   }
 
-  private _evaluateHLQueryPart (transaction: X12Transaction, hlPath: string): X12Segment[] {
+  private _evaluateHLQueryPart (segments: X12Segment[], hlPath: string): X12Segment[] {
     let qualified = false
     const pathParts = hlPath.replace('-', '').split('+').filter((value, index, array) => { return (value !== 'HL' && value !== '' && value !== null) })
     const matches = new Array<X12Segment>()
 
     let lastParentIndex = -1
 
-    for (let i = 0, j = 0; i < transaction.segments.length; i++) {
-      const segment = transaction.segments[i]
+    for (let i = 0, j = 0; i < segments.length; i++) {
+      const segment = segments[i]
 
       if (qualified && segment.tag === 'HL') {
         const parentIndex = parseInt(segment.valueOf(2, '-1'))
@@ -184,7 +202,7 @@ export class X12QueryEngine {
         }
       }
 
-      if (!qualified && transaction.segments[i].tag === 'HL' && transaction.segments[i].valueOf(3) === pathParts[j]) {
+      if (!qualified && segments[i].tag === 'HL' && segments[i].valueOf(3) === pathParts[j]) {
         lastParentIndex = parseInt(segment.valueOf(2, '-1'))
         j++
 
@@ -194,7 +212,7 @@ export class X12QueryEngine {
       }
 
       if (qualified) {
-        matches.push(transaction.segments[i])
+        matches.push(segments[i])
       }
     }
 

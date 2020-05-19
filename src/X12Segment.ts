@@ -20,7 +20,8 @@ export class X12Segment {
     this.tag = tag
     this.elements = new Array<X12Element>()
     this.range = new Range()
-    this.options = defaultSerializationOptions(options)
+    this.options = defaultSerializationOptions(options, false)
+    this.parseIndex = -1
   }
 
   tag: string;
@@ -28,6 +29,8 @@ export class X12Segment {
   range: Range;
   options: X12SerializationOptions;
   loopPath?: string;
+  loopIndex?: number;
+  parseIndex: number
 
   /**
    * @description Set the elements of this segment.

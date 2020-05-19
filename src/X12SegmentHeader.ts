@@ -10,6 +10,8 @@ export interface X12SegmentHeader {
   trailer?: string
   layout: any
   loopStyle?: X12SegmentHeaderLoopStyle
+  loopIdIndex?: number
+  loopNoUnboundedChildren?: boolean
 }
 
 export const ISASegmentHeader: X12SegmentHeader = {
@@ -72,7 +74,8 @@ export const STSegmentHeader: X12SegmentHeader = {
     COUNT: 2,
     PADDING: false
   },
-  loopStyle: X12SegmentHeaderLoopStyle.Bounded
+  loopStyle: X12SegmentHeaderLoopStyle.Bounded,
+  loopIdIndex: 1
 }
 
 export const LSSegmentHeader: X12SegmentHeader = {
@@ -84,7 +87,9 @@ export const LSSegmentHeader: X12SegmentHeader = {
     COUNT: 1,
     PADDING: false
   },
-  loopStyle: X12SegmentHeaderLoopStyle.Bounded
+  loopStyle: X12SegmentHeaderLoopStyle.Bounded,
+  loopIdIndex: 1,
+  loopNoUnboundedChildren: true
 }
 
 export const LESegmentHeader: X12SegmentHeader = {
@@ -97,10 +102,27 @@ export const LESegmentHeader: X12SegmentHeader = {
   }
 }
 
+export const HLSegmentHeader: X12SegmentHeader = {
+  tag: 'HL',
+  layout: {
+    HL01: 12,
+    HL01_MIN: 1,
+    HL02: 12,
+    HL03: 2,
+    HL03_MIN: 1,
+    HL04: 1,
+    COUNT: 4,
+    PADDING: false
+  },
+  loopStyle: X12SegmentHeaderLoopStyle.Unbounded,
+  loopIdIndex: 3
+}
+
 export const StandardSegmentHeaders = [
   ISASegmentHeader,
   GSSegmentHeader,
   STSegmentHeader,
+  HLSegmentHeader,
   LSSegmentHeader,
   LESegmentHeader
 ]

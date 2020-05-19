@@ -15,11 +15,11 @@ export class X12Generator {
     this.jsen = jsen === undefined ? new JSEDINotation() : jsen
 
     if (jsen.options !== undefined) {
-      this.options = defaultSerializationOptions(jsen.options)
-    }
-
-    if (options !== undefined) {
-      this.options = defaultSerializationOptions(options)
+      this.options = defaultSerializationOptions(jsen.options, false)
+    } else if (options !== undefined) {
+      this.options = defaultSerializationOptions(options, false)
+    } else {
+      this.options = defaultSerializationOptions()
     }
 
     this.interchange = new X12Interchange(this.options)
@@ -50,7 +50,7 @@ export class X12Generator {
    * @param {X12SerializationOptions} [options] - Options for serializing back to EDI.
    */
   setOptions (options: X12SerializationOptions): void {
-    this.options = defaultSerializationOptions(options)
+    this.options = defaultSerializationOptions(options, false)
   }
 
   /**

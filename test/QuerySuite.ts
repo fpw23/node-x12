@@ -1,7 +1,7 @@
 'use strict'
 
 import 'mocha'
-import { X12Parser, X12QueryEngine } from '../core'
+import { X12Parser, X12QueryEngine, StandardSegmentHeaders, X12SegmentHeaderLoopStyle } from '../core'
 
 import fs = require('fs')
 
@@ -162,6 +162,79 @@ describe('X12QueryEngine', () => {
       }
     } else {
       throw new Error(`Expected exactly one result. Found ${results.length}.`)
+    }
+  })
+
+  it('should handle FORSEGLOOP marco references', () => {
+    const edi = fs.readFileSync('test/test-data/271.edi', 'utf8')
+    const parser = new X12Parser({
+      segmentHeaders: [
+        ...StandardSegmentHeaders,
+        {
+          tag: 'NM1',
+          layout: {
+            NM101: 3,
+            NM101_MIN: 2,
+            NM102: 1,
+            NM102_MIN: 1,
+            NM103: 60,
+            NM103_MIN: 1,
+            NM104: 35,
+            NM105: 25,
+            NM106: 10,
+            NM107: 10,
+            NM108: 2,
+            NM108_MIN: 1,
+            NM109: 80,
+            NM109_MIN: 2,
+            NM110: 2,
+            NM111: 3,
+            NM112: 60,
+            COUNT: 12,
+            PADDING: false
+          },
+          loopStyle: X12SegmentHeaderLoopStyle.Unbounded,
+          loopIdIndex: 1
+        },
+        {
+          tag: 'EB',
+          layout: {
+            EB01: 3,
+            EB01_MIN: 1,
+            EB02: 3,
+            EB03: 2,
+            EB04: 3,
+            EB05: 50,
+            EB06: 2,
+            EB07: 18,
+            EB08: 10,
+            EB09: 2,
+            EB10: 15,
+            EB11: 1,
+            EB12: 1,
+            EB13: 1,
+            EB14: 1,
+            COUNT: 14,
+            PADDING: false
+          },
+          loopStyle: X12SegmentHeaderLoopStyle.Unbounded,
+          loopIdIndex: 1
+        }
+      ]
+    })
+
+    const engine = new X12QueryEngine(parser)
+    const results = engine.query(edi, 'FORSEGLOOP(ISA.GS.ST=271.HL=22.NM1=IL.EB=1)=>DTP03')
+
+    if (results.length === 2) {
+      if (results[0].value.trim() !== '20150701') {
+        throw new Error(`Expected 20150701 for first result, found ${results[0].value}.`)
+      }
+      if (results[1].value.trim() !== '20150701') {
+        throw new Error(`Expected 20150701 for second result, found ${results[0].value}.`)
+      }
+    } else {
+      throw new Error(`Expected two results. Found ${results.length}.`)
     }
   })
 })

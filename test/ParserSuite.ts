@@ -1,7 +1,7 @@
 'use strict'
 
 import 'mocha'
-import { X12Parser, X12Interchange, X12Segment } from '../core'
+import { X12Parser, X12Interchange, X12Segment, StandardSegmentHeaders, X12SegmentHeaderLoopStyle } from '../core'
 
 import fs = require('fs')
 
@@ -38,7 +38,6 @@ describe('X12Parser', () => {
         .on('end', () => {
           const edi = fs.readFileSync('test/test-data/850.edi', 'utf8')
           const interchange = parser.getInterchangeFromSegments(segments)
-
           if (interchange.toString() !== edi) {
             reject(new Error('Expected parsed EDI stream to match raw EDI document.'))
           }
@@ -113,25 +112,67 @@ describe('X12Parser', () => {
     }
   })
 
-  it.only('should set segment paths using segment header loopStyle', () => {
+  it('should parse segment loops when set in option segmentHeaders', () => {
     const edi = fs.readFileSync('test/test-data/271.edi', 'utf8')
-    const parser = new X12Parser(true)
+    const parser = new X12Parser({
+      segmentHeaders: [
+        ...StandardSegmentHeaders,
+        {
+          tag: 'NM1',
+          layout: {
+            NM101: 3,
+            NM101_MIN: 2,
+            NM102: 1,
+            NM102_MIN: 1,
+            NM103: 60,
+            NM103_MIN: 1,
+            NM104: 35,
+            NM105: 25,
+            NM106: 10,
+            NM107: 10,
+            NM108: 2,
+            NM108_MIN: 1,
+            NM109: 80,
+            NM109_MIN: 2,
+            NM110: 2,
+            NM111: 3,
+            NM112: 60,
+            COUNT: 12,
+            PADDING: false
+          },
+          loopStyle: X12SegmentHeaderLoopStyle.Unbounded,
+          loopIdIndex: 1
+        },
+        {
+          tag: 'EB',
+          layout: {
+            EB01: 3,
+            EB01_MIN: 1,
+            EB02: 3,
+            EB03: 2,
+            EB04: 3,
+            EB05: 50,
+            EB06: 2,
+            EB07: 18,
+            EB08: 10,
+            EB09: 2,
+            EB10: 15,
+            EB11: 1,
+            EB12: 1,
+            EB13: 1,
+            EB14: 1,
+            COUNT: 14,
+            PADDING: false
+          },
+          loopStyle: X12SegmentHeaderLoopStyle.Unbounded,
+          loopIdIndex: 1
+        }
+      ]
+    })
 
     const interchange = parser.parse(edi) as X12Interchange
 
-    const segmentPaths: any[] = []
-
-    interchange.functionalGroups.forEach((fg) => {
-      fg.transactions.forEach((t) => {
-        t.segments.forEach((s) => {
-          if (s.loopPath !== undefined) {
-            segmentPaths.push(`${s.tag}: ${s.loopPath}`)
-          }
-        })
-      })
-    })
-
-    console.log(segmentPaths)
+    const segmentPaths = interchange.getSegmentLoops()
 
     if (segmentPaths.length === 0) {
       throw new Error('Unable to find any segment loop paths')

@@ -1,5 +1,6 @@
 'use strict'
 import { X12SegmentHeader, StandardSegmentHeaders } from './X12SegmentHeader'
+import * as os from 'os'
 
 /**
  * @description Options for serializing to and from EDI.
@@ -18,23 +19,26 @@ export interface X12SerializationOptions {
   subElementDelimiter?: string
   repetitionDelimiter?: string
   segmentHeaders?: X12SegmentHeader[]
+  canOverwrite?: boolean
 }
 
 /**
  * @description Set default values for any missing X12SerializationOptions in an options object.
  * @param {X12SerializationOptions} [options] - Options for serializing to and from EDI.
+ * @param {boolean} [canOverwrite] - Configure if this options can be overwritten.
  * @returns {X12SerializationOptions} Serialization options with defaults filled in.
  */
-export function defaultSerializationOptions (options?: X12SerializationOptions): X12SerializationOptions {
+export function defaultSerializationOptions (options?: X12SerializationOptions, canOverwrite: boolean = true): X12SerializationOptions {
   options = options === undefined ? {} : options
 
   options.elementDelimiter = options.elementDelimiter === undefined ? '*' : options.elementDelimiter
-  options.endOfLine = options.endOfLine === undefined ? '\n' : options.endOfLine
+  options.endOfLine = options.endOfLine === undefined ? os.EOL : options.endOfLine
   options.format = options.format === undefined ? false : options.format
   options.segmentTerminator = options.segmentTerminator === undefined ? '~' : options.segmentTerminator
   options.subElementDelimiter = options.subElementDelimiter === undefined ? '>' : options.subElementDelimiter
   options.repetitionDelimiter = options.repetitionDelimiter === undefined ? '^' : options.repetitionDelimiter
   options.segmentHeaders = options.segmentHeaders === undefined ? StandardSegmentHeaders : options.segmentHeaders
+  options.canOverwrite = canOverwrite
 
   if (options.segmentTerminator === '\n') {
     options.endOfLine = ''

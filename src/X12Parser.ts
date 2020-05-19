@@ -12,6 +12,7 @@ import { X12Transaction } from './X12Transaction'
 import { X12Segment } from './X12Segment'
 import { X12Element } from './X12Element'
 import { defaultSerializationOptions, X12SerializationOptions } from './X12SerializationOptions'
+import { X12SegmentHeaderLoopStyle } from './X12SegmentHeader'
 
 const DOCUMENT_MIN_LENGTH: number = 113 // ISA = 106, IEA > 7
 const SEGMENT_TERMINATOR_POS: number = 105
@@ -29,15 +30,18 @@ export class X12Parser extends Transform {
    * @param {X12SerializationOptions} [options] - The options to use when parsing a stream.
    */
   constructor (strict?: boolean | X12SerializationOptions, encoding?: 'ascii' | 'utf8' | X12SerializationOptions, options?: X12SerializationOptions) {
+    let allowOptionOverwrite = options === undefined
     if (strict === undefined) {
       strict = false
     } else if (typeof strict !== 'boolean') {
+      allowOptionOverwrite = false
       options = strict
       strict = false
     }
     if (encoding === undefined) {
       encoding = 'utf8'
     } else if (typeof encoding !== 'string') {
+      allowOptionOverwrite = false
       options = encoding
       encoding = 'utf8'
     }
@@ -49,7 +53,7 @@ export class X12Parser extends Transform {
     })
     this.diagnostics = new Array<X12Diagnostic>()
     this._strict = strict
-    this._options = options
+    this._options = defaultSerializationOptions(options, allowOptionOverwrite)
     this._decoder = new StringDecoder(encoding)
     this._parsedISA = false
     this._flushing = false
@@ -111,7 +115,13 @@ export class X12Parser extends Transform {
    * @returns {X12Interchange|X12FatInterchange} An interchange or fat interchange.
    */
   getInterchangeFromSegments (segments: X12Segment[], options?: X12SerializationOptions): X12Interchange | X12FatInterchange {
-    this._options = options === undefined ? this._options : defaultSerializationOptions(options)
+    if (options !== undefined) {
+      if (this._options.canOverwrite === false) {
+        throw new Error('Options passed in via constructor can not be overridden by instance methods')
+      } else {
+        this._options = defaultSerializationOptions(options)
+      }
+    }
 
     segments.forEach((segment) => {
       this._processSegment(segment)
@@ -157,35 +167,51 @@ export class X12Parser extends Transform {
   }
 
   private _detectOptions (edi: string, options?: X12SerializationOptions): void {
-    const segmentTerminator = edi.charAt(SEGMENT_TERMINATOR_POS)
-    const elementDelimiter = edi.charAt(ELEMENT_DELIMITER_POS)
-    const subElementDelimiter = edi.charAt(SUBELEMENT_DELIMITER_POS)
-    const repetitionDelimiter = edi.charAt(REPETITION_DELIMITER_POS)
-    let endOfLine = edi.charAt(END_OF_LINE_POS)
-    let format = false
-
     if (options === undefined) {
-      if (endOfLine !== '\r' && endOfLine !== '\n') {
-        endOfLine = undefined
+      if (this._options.canOverwrite === false) {
       } else {
-        format = true
-      }
+        const segmentTerminator = edi.charAt(SEGMENT_TERMINATOR_POS)
+        const elementDelimiter = edi.charAt(ELEMENT_DELIMITER_POS)
+        const subElementDelimiter = edi.charAt(SUBELEMENT_DELIMITER_POS)
+        const repetitionDelimiter = edi.charAt(REPETITION_DELIMITER_POS)
 
-      if (endOfLine === '\r' && edi.charAt(END_OF_LINE_POS + 1) === '\n') {
-        endOfLine = '\r\n'
-      }
+        let endOfLine = edi.charAt(END_OF_LINE_POS)
+        let format = false
 
-      this._options = defaultSerializationOptions({
-        segmentTerminator,
-        elementDelimiter,
-        subElementDelimiter,
-        repetitionDelimiter,
-        endOfLine,
-        format
-      })
+        if (endOfLine !== '\r' && endOfLine !== '\n') {
+          endOfLine = undefined
+        } else {
+          format = true
+        }
+
+        if (endOfLine === '\r' && edi.charAt(END_OF_LINE_POS + 1) === '\n') {
+          endOfLine = '\r\n'
+        }
+
+        this._options = defaultSerializationOptions({
+          segmentTerminator,
+          elementDelimiter,
+          subElementDelimiter,
+          repetitionDelimiter,
+          endOfLine,
+          format
+        })
+      }
     } else {
       this._options = defaultSerializationOptions(options)
     }
+  }
+
+  private findLastIndex (list: any[] = [], predicate: any): any {
+    if (list.length === 0) return -1
+
+    if (predicate === undefined) return list.length - 1
+
+    for (let i = list.length - 1; i >= 0; --i) {
+      if (predicate(list[i]) === true) return i
+    }
+
+    return -1
   }
 
   private _parseSegments (edi: string, segmentTerminator: string, elementDelimiter: string): X12Segment[] {
@@ -194,9 +220,9 @@ export class X12Parser extends Transform {
     let tagged = false
     let currentSegment: X12Segment
     let currentElement: X12Element
-    const loopPath: any[] = []
+    let loopPath: any[] = []
     let loopPathTrailers: string[] = []
-    let currentLoopPath: any = { index: 0 }
+    let currentLoopPath: any = { index: 1 }
 
     currentSegment = new X12Segment()
     currentSegment.options = this._options
@@ -238,42 +264,66 @@ export class X12Parser extends Transform {
         const header = currentSegment.getHeader()
 
         // is it time to manage the loop?
+        const loopPathUnboundTagIndex = this.findLastIndex(loopPath, (t: any) => { return currentSegment.tag === t.tag && t.type === X12SegmentHeaderLoopStyle.Unbounded })
         if (currentSegment.tag === currentLoopPath.tag) {
-          // we are ending an unbounded loop
-          loopPath.shift()
+          // we are ending an unbounded loop and entering a new of the same type
+          loopPath.pop()
           // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
           const nextIndex = currentLoopPath.index + 1
           currentLoopPath = {
             tag: header.tag,
-            // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+            pathTag: header.loopIdIndex === undefined ? header.tag : `${header.tag}=${currentSegment.valueOf(header.loopIdIndex)}`,
             index: nextIndex,
             trailer: header.trailer,
-            path: `${[...loopPath.map((lp) => lp.tag), header.tag].join('.')}:${nextIndex}`
+            type: header.loopStyle,
+            allowUnboundChildren: !(header.loopNoUnboundedChildren === true)
           }
           loopPath.push(currentLoopPath)
+        } else if (loopPathUnboundTagIndex > -1) {
+          // we are ending an unbound loop at a higher index unless the current loop stops us
+          if (currentLoopPath.allowUnboundChildren === true) {
+            // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+            loopPath = loopPath.slice(0, loopPathUnboundTagIndex + 1)
+            const unboundPrevious = loopPath.pop()
+            // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+            const nextIndex = unboundPrevious.index + 1
+            currentLoopPath = {
+              tag: header.tag,
+              pathTag: header.loopIdIndex === undefined ? header.tag : `${header.tag}=${currentSegment.valueOf(header.loopIdIndex)}`,
+              index: nextIndex,
+              trailer: header.trailer,
+              type: header.loopStyle,
+              allowUnboundChildren: !(header.loopNoUnboundedChildren === true)
+            }
+            loopPath.push(currentLoopPath)
+          }
         } else if (loopPathTrailers.findIndex((t) => currentSegment.tag === t) > -1) {
           // we are ending a bound loop
-          loopPath.shift()
+          loopPath.pop()
           if (loopPath.length > 0) {
             currentLoopPath = loopPath[loopPath.length - 1]
           } else {
-            currentLoopPath = { index: 0 }
+            currentLoopPath = { index: 1 }
           }
         } else if (header !== undefined && header.loopStyle !== undefined) {
           // we are staring a new loop
           currentLoopPath = {
             tag: header.tag,
-            index: 0,
+            pathTag: header.loopIdIndex === undefined ? header.tag : `${header.tag}=${currentSegment.valueOf(header.loopIdIndex)}`,
+            index: 1,
             trailer: header.trailer,
-            path: `${[...loopPath.map((lp) => lp.tag), header.tag].join('.')}:0`
+            type: header.loopStyle,
+            allowUnboundChildren: !(header.loopNoUnboundedChildren === true)
           }
           loopPath.push(currentLoopPath)
           // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
           loopPathTrailers = loopPath.map((lp) => { return lp.trailer || '' })
         }
 
-        currentSegment.loopPath = currentLoopPath.path
+        currentSegment.loopPath = loopPath.map((lp) => lp.pathTag).join('.')
+        currentSegment.loopIndex = currentLoopPath.index
         segments.push(currentSegment)
+        currentSegment.parseIndex = segments.length
 
         currentSegment = new X12Segment()
         currentSegment.options = this._options
@@ -502,7 +552,7 @@ export class X12Parser extends Transform {
     let rawSegments: string[]
 
     if (!this._parsedISA && chunk.length >= DOCUMENT_MIN_LENGTH) {
-      this._detectOptions(chunk, this._options)
+      this._detectOptions(chunk)
 
       this._validateIsaLength(chunk, this._options.elementDelimiter)
 
