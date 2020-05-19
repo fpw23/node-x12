@@ -237,4 +237,174 @@ describe('X12QueryEngine', () => {
       throw new Error(`Expected two results. Found ${results.length}.`)
     }
   })
+
+  it('should handle FORSEGLOOP marco references where path is RegEx', () => {
+    const edi = fs.readFileSync('test/test-data/271.edi', 'utf8')
+    const parser = new X12Parser(true, {
+      segmentHeaders: [
+        ...StandardSegmentHeaders,
+        {
+          tag: 'NM1',
+          layout: {
+            NM101: 3,
+            NM101_MIN: 2,
+            NM102: 1,
+            NM102_MIN: 1,
+            NM103: 60,
+            NM103_MIN: 1,
+            NM104: 35,
+            NM105: 25,
+            NM106: 10,
+            NM107: 10,
+            NM108: 2,
+            NM108_MIN: 1,
+            NM109: 80,
+            NM109_MIN: 2,
+            NM110: 2,
+            NM111: 3,
+            NM112: 60,
+            COUNT: 12,
+            PADDING: false
+          },
+          loopStyle: X12SegmentHeaderLoopStyle.Unbounded,
+          loopIdIndex: 1
+        },
+        {
+          tag: 'EB',
+          layout: {
+            EB01: 3,
+            EB01_MIN: 1,
+            EB02: 3,
+            EB03: 2,
+            EB04: 3,
+            EB05: 50,
+            EB06: 2,
+            EB07: 18,
+            EB08: 10,
+            EB09: 2,
+            EB10: 15,
+            EB11: 1,
+            EB12: 1,
+            EB13: 1,
+            EB14: 1,
+            COUNT: 14,
+            PADDING: false
+          },
+          loopStyle: X12SegmentHeaderLoopStyle.Unbounded,
+          loopIdIndex: 1
+        }
+      ]
+    })
+
+    const engine = new X12QueryEngine(parser)
+    const results = engine.query(edi, 'FORSEGLOOP(^ISA\\.GS\\.ST=271\\.HL=22\\.NM1=IL.EB=.*)=>DTP03')
+
+    if (results.length === 7) {
+      if (results[0].value.trim() !== '20150701') {
+        throw new Error(`Expected 20150701 for first result, found ${results[0].value}.`)
+      }
+      if (results[1].value.trim() !== '20150701') {
+        throw new Error(`Expected 20150701 for second result, found ${results[1].value}.`)
+      }
+      if (results[2].value.trim() !== '20190101-20191231') {
+        throw new Error(`Expected 20190101-20191231 for second result, found ${results[2].value}.`)
+      }
+      if (results[3].value.trim() !== '20190101-20191231') {
+        throw new Error(`Expected 20190101-20191231 for second result, found ${results[3].value}.`)
+      }
+      if (results[4].value.trim() !== '20190101-20191231') {
+        throw new Error(`Expected 20190101-20191231 for second result, found ${results[4].value}.`)
+      }
+      if (results[5].value.trim() !== '20170201') {
+        throw new Error(`Expected 20170201 for second result, found ${results[5].value}.`)
+      }
+      if (results[6].value.trim() !== '20170101') {
+        throw new Error(`Expected 20170101 for second result, found ${results[6].value}.`)
+      }
+    } else {
+      throw new Error(`Expected seven results. Found ${results.length}.`)
+    }
+  })
+
+  it('should handle FORSEGLOOP marco references with * for query', () => {
+    const edi = fs.readFileSync('test/test-data/271.edi', 'utf8')
+    const parser = new X12Parser({
+      segmentHeaders: [
+        ...StandardSegmentHeaders,
+        {
+          tag: 'NM1',
+          layout: {
+            NM101: 3,
+            NM101_MIN: 2,
+            NM102: 1,
+            NM102_MIN: 1,
+            NM103: 60,
+            NM103_MIN: 1,
+            NM104: 35,
+            NM105: 25,
+            NM106: 10,
+            NM107: 10,
+            NM108: 2,
+            NM108_MIN: 1,
+            NM109: 80,
+            NM109_MIN: 2,
+            NM110: 2,
+            NM111: 3,
+            NM112: 60,
+            COUNT: 12,
+            PADDING: false
+          },
+          loopStyle: X12SegmentHeaderLoopStyle.Unbounded,
+          loopIdIndex: 1
+        },
+        {
+          tag: 'EB',
+          layout: {
+            EB01: 3,
+            EB01_MIN: 1,
+            EB02: 3,
+            EB03: 2,
+            EB04: 3,
+            EB05: 50,
+            EB06: 2,
+            EB07: 18,
+            EB08: 10,
+            EB09: 2,
+            EB10: 15,
+            EB11: 1,
+            EB12: 1,
+            EB13: 1,
+            EB14: 1,
+            COUNT: 14,
+            PADDING: false
+          },
+          loopStyle: X12SegmentHeaderLoopStyle.Unbounded,
+          loopIdIndex: 1
+        }
+      ]
+    })
+
+    const engine = new X12QueryEngine(parser)
+    const results = engine.query(edi, 'FORSEGLOOP(ISA.GS.ST=271.HL=22.NM1=IL)=>*')
+
+    if (results.length === 5) {
+      if (results[0].value.trim() !== 'IL') {
+        throw new Error(`Expected IL for first result, found ${results[0].value}.`)
+      }
+      if (results[1].value.trim() !== '1029 SALEM AVE') {
+        throw new Error(`Expected '1029 SALEM AVE' for second result, found ${results[1].value}.`)
+      }
+      if (results[2].value.trim() !== 'WOODBURY') {
+        throw new Error(`Expected 'WOODBURY' for second result, found ${results[2].value}.`)
+      }
+      if (results[3].value.trim() !== 'D8') {
+        throw new Error(`Expected 'D8' for second result, found ${results[3].value}.`)
+      }
+      if (results[4].value.trim() !== '307') {
+        throw new Error(`Expected '307' for second result, found ${results[4].value}.`)
+      }
+    } else {
+      throw new Error(`Expected five results. Found ${results.length}.`)
+    }
+  })
 })

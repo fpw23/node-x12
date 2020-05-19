@@ -37,6 +37,7 @@ export class X12QueryEngine {
       ? this._parser.parse(rawEdi) as X12Interchange
       : rawEdi
     let segLoopFilter: string
+    let segLoopFilterIsRegex: boolean = false
 
     const forEachMatch = reference.match(this._forEachPattern) // ex. FOREACH(LX)=>MAN02
 
@@ -57,6 +58,7 @@ export class X12QueryEngine {
 
     if (forSegLoopMatch.length === 1) {
       segLoopFilter = forSegLoopMatch[0][1]
+      segLoopFilterIsRegex = segLoopFilter !== undefined ? segLoopFilter[0] === '^' : false
       reference = forSegLoopMatch[0][2]
     } else if (forSegLoopMatch.length > 1) {
       throw new Error('Error parsing FORSEGLOOP marco, found too many results.')
@@ -67,7 +69,7 @@ export class X12QueryEngine {
     const elmRefMatch = reference.match(/[A-Z0-9]{2,3}[0-9]{2}[^[]?/g) // ex. REF02; need to remove trailing ":" if exists
     const qualMatch = reference.match(/:[A-Z0-9]{2,3}[0-9]{2,}\[["'][^[\]"']+["']\]/g) // ex. :REF01["PO"]
 
-    const results = new Array<X12QueryResult>()
+    let results = new Array<X12QueryResult>()
 
     for (let i = 0; i < interchange.functionalGroups.length; i++) {
       const group = interchange.functionalGroups[i]
@@ -77,7 +79,11 @@ export class X12QueryEngine {
         let segments
 
         if (segLoopFilter !== undefined) {
-          segments = txn.segments.filter((s) => { return s.loopPath === segLoopFilter })
+          if (segLoopFilterIsRegex === true) {
+            segments = txn.segments.filter((s) => { return s.loopIndex !== undefined ? s.loopPath.match(segLoopFilter) !== null : false })
+          } else {
+            segments = txn.segments.filter((s) => { return s.loopPath === segLoopFilter })
+          }
         } else {
           segments = txn.segments
         }
@@ -91,18 +97,22 @@ export class X12QueryEngine {
         }
 
         if (elmRefMatch === null) {
-          throw new QuerySyntaxError('Element reference queries must contain an element reference!')
+          if (reference !== '*') {
+            throw new QuerySyntaxError('Element reference queries must contain an element reference!')
+          }
         }
 
-        const txnResults = this._evaluateElementReferenceQueryPart(interchange, group, txn, [].concat(segments, [interchange.header, group.header, txn.header, txn.trailer, group.trailer, interchange.trailer]), elmRefMatch[0], qualMatch, defaultValue)
-
-        txnResults.forEach((res) => {
-          if (concat !== undefined) {
-            res.value = `${concat.value}${concat.separator}${res.value}`
-          }
-
-          results.push(res)
-        })
+        if (reference === '*') {
+          results = this._evaluateStarReferenceQueryPart(interchange, group, txn, segments)
+        } else {
+          const txnResults = this._evaluateElementReferenceQueryPart(interchange, group, txn, [].concat(segments, [interchange.header, group.header, txn.header, txn.trailer, group.trailer, interchange.trailer]), elmRefMatch[0], qualMatch, defaultValue)
+          txnResults.forEach((res) => {
+            if (concat !== undefined) {
+              res.value = `${concat.value}${concat.separator}${res.value}`
+            }
+            results.push(res)
+          })
+        }
       }
     }
 
@@ -247,12 +257,11 @@ export class X12QueryEngine {
   }
 
   private _evaluateElementReferenceQueryPart (interchange: X12Interchange, functionalGroup: X12FunctionalGroup, transaction: X12Transaction, segments: X12Segment[], elementReference: string, qualifiers: string[], defaultValue: string = null): X12QueryResult[] {
+    const results = new Array<X12QueryResult>()
     const reference = elementReference.replace(':', '')
     const tag = reference.substr(0, reference.length - 2)
     const pos = reference.substr(reference.length - 2, 2)
     const posint = parseInt(pos)
-
-    const results = new Array<X12QueryResult>()
 
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i]
@@ -269,6 +278,26 @@ export class X12QueryEngine {
 
       if (value !== null && this._testQualifiers(transaction, segment, qualifiers)) {
         results.push(new X12QueryResult(interchange, functionalGroup, transaction, segment, segment.elements[posint - 1], value))
+      }
+    }
+
+    return results
+  }
+
+  private _evaluateStarReferenceQueryPart (interchange: X12Interchange, functionalGroup: X12FunctionalGroup, transaction: X12Transaction, segments: X12Segment[]): X12QueryResult[] {
+    const results = new Array<X12QueryResult>()
+
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i]
+
+      if (segment === null || segment === undefined) {
+        continue
+      }
+
+      const value = segment.valueOf(1, '?')
+
+      if (value !== null) {
+        results.push(new X12QueryResult(interchange, functionalGroup, transaction, segment, segment.elements[0], value))
       }
     }
 
