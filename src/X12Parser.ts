@@ -272,7 +272,7 @@ export class X12Parser extends Transform {
           const nextIndex = currentLoopPath.index + 1
           currentLoopPath = {
             tag: header.tag,
-            pathTag: header.loopIdIndex === undefined ? header.tag : `${header.tag}=${currentSegment.valueOf(header.loopIdIndex)}`,
+            pathTag: header.loopIdIndex === undefined ? header.tag : `${header.tag}=${currentSegment.valueOf(header.loopIdIndex)}[${nextIndex}]`,
             index: nextIndex,
             trailer: header.trailer,
             type: header.loopStyle,
@@ -289,7 +289,7 @@ export class X12Parser extends Transform {
             const nextIndex = unboundPrevious.index + 1
             currentLoopPath = {
               tag: header.tag,
-              pathTag: header.loopIdIndex === undefined ? header.tag : `${header.tag}=${currentSegment.valueOf(header.loopIdIndex)}`,
+              pathTag: header.loopIdIndex === undefined ? header.tag : `${header.tag}=${currentSegment.valueOf(header.loopIdIndex)}[${nextIndex}]`,
               index: nextIndex,
               trailer: header.trailer,
               type: header.loopStyle,
@@ -309,7 +309,7 @@ export class X12Parser extends Transform {
           // we are staring a new loop
           currentLoopPath = {
             tag: header.tag,
-            pathTag: header.loopIdIndex === undefined ? header.tag : `${header.tag}=${currentSegment.valueOf(header.loopIdIndex)}`,
+            pathTag: header.loopIdIndex === undefined ? header.tag : `${header.tag}=${currentSegment.valueOf(header.loopIdIndex)}[1]`,
             index: 1,
             trailer: header.trailer,
             type: header.loopStyle,
@@ -321,6 +321,7 @@ export class X12Parser extends Transform {
         }
 
         currentSegment.loopPath = loopPath.map((lp) => lp.pathTag).join('.')
+        // console.log(currentSegment.loopPath)
         currentSegment.loopIndex = currentLoopPath.index
         segments.push(currentSegment)
         currentSegment.parseIndex = segments.length

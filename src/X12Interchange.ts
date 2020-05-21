@@ -121,7 +121,7 @@ export class X12Interchange {
         t.segments.forEach((s) => {
           if (s.loopPath !== undefined) {
             if (textOnly === true) {
-              segmentLoops.push(`${s.loopPath}(${s.loopIndex}) - ${s.tag}(${s.parseIndex})`)
+              segmentLoops.push(`${s.loopPath} - ${s.tag}(${s.parseIndex})`)
             } else {
               segmentLoops.push({
                 tag: s.tag,

@@ -224,17 +224,14 @@ describe('X12QueryEngine', () => {
     })
 
     const engine = new X12QueryEngine(parser)
-    const results = engine.query(edi, 'FORSEGLOOP(ISA.GS.ST=271.HL=22.NM1=IL.EB=1)=>DTP03')
+    const results = engine.query(edi, 'FORSEGLOOP(ISA.GS.ST=271[1].HL=22[3].NM1=IL[1].EB=1[2])=>DTP03')
 
-    if (results.length === 2) {
+    if (results.length === 1) {
       if (results[0].value.trim() !== '20150701') {
-        throw new Error(`Expected 20150701 for first result, found ${results[0].value}.`)
-      }
-      if (results[1].value.trim() !== '20150701') {
         throw new Error(`Expected 20150701 for second result, found ${results[0].value}.`)
       }
     } else {
-      throw new Error(`Expected two results. Found ${results.length}.`)
+      throw new Error(`Expected one results. Found ${results.length}.`)
     }
   })
 
@@ -297,7 +294,7 @@ describe('X12QueryEngine', () => {
     })
 
     const engine = new X12QueryEngine(parser)
-    const results = engine.query(edi, 'FORSEGLOOP(^ISA\\.GS\\.ST=271\\.HL=22\\.NM1=IL.EB=.*)=>DTP03')
+    const results = engine.query(edi, 'FORSEGLOOP(^ISA\\.GS\\.ST=271\\[.*\\]\\.HL=22\\[.*\\]\\.NM1=IL\\[.*\\].EB=.*)=>DTP03')
 
     if (results.length === 7) {
       if (results[0].value.trim() !== '20150701') {
@@ -385,7 +382,7 @@ describe('X12QueryEngine', () => {
     })
 
     const engine = new X12QueryEngine(parser)
-    const results = engine.query(edi, 'FORSEGLOOP(ISA.GS.ST=271.HL=22.NM1=IL)=>*')
+    const results = engine.query(edi, 'FORSEGLOOP(ISA.GS.ST=271[1].HL=22[3].NM1=IL[1])=>*')
 
     if (results.length === 5) {
       if (results[0].value.trim() !== 'IL') {

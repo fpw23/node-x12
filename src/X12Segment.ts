@@ -30,7 +30,7 @@ export class X12Segment {
   options: X12SerializationOptions;
   loopPath?: string;
   loopIndex?: number;
-  parseIndex: number
+  parseIndex: number;
 
   /**
    * @description Set the elements of this segment.
